@@ -2,13 +2,13 @@
 # ============================================================
 # Epic Kiosk - 自动驾驶领取系统（本地部署版）
 # ============================================================
-# GitHub: https://github.com/10000ge10000/epic-kiosk
+# GitHub: https://github.com/Shy0o/epic-kiosk
 # 公益站点: https://epic.910501.xyz/
 # ============================================================
 #
 # 使用方式：
 #   1. 克隆项目后，在项目目录执行: ./install.sh
-#   2. 或一键部署: curl -fsSL https://raw.githubusercontent.com/10000ge10000/epic-kiosk/main/install.sh | bash
+#   2. 或一键部署: curl -fsSL https://raw.githubusercontent.com/Shy0o/epic-kiosk/main/install.sh | bash
 #
 # ============================================================
 
@@ -183,7 +183,7 @@ clone_project() {
                 PROJECT_DIR="$PROJECT_DIR/epic-kiosk"
             fi
             print_info "克隆项目到 $PROJECT_DIR ..."
-            git clone -b main https://github.com/10000ge10000/epic-kiosk.git "$PROJECT_DIR"
+            git clone -b main https://github.com/Shy0o/epic-kiosk.git "$PROJECT_DIR"
         fi
     else
         # 管道模式：自动创建目录并克隆
@@ -195,7 +195,7 @@ clone_project() {
             cd "$PROJECT_DIR" && git pull origin main 2>/dev/null || print_warning "更新失败，继续使用现有代码"
         else
             print_info "克隆项目..."
-            git clone -b main https://github.com/10000ge10000/epic-kiosk.git "$PROJECT_DIR"
+            git clone -b main https://github.com/Shy0o/epic-kiosk.git "$PROJECT_DIR"
         fi
     fi
 
@@ -355,7 +355,7 @@ show_complete() {
     echo ""
     echo -e "${CYAN}相关链接:${NC}"
     echo "  公益站点: https://epic.910501.xyz/"
-    echo "  GitHub: https://github.com/10000ge10000/epic-kiosk"
+    echo "  GitHub: https://github.com/Shy0o/epic-kiosk"
     echo "  B 站: https://space.bilibili.com/59438380"
     echo ""
 }

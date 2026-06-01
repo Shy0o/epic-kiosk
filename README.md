@@ -35,7 +35,7 @@
 适用于云服务器、VPS、Linux 主机：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/10000ge10000/epic-kiosk/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Shy0o/epic-kiosk/main/install.sh | bash
 ```
 
 脚本功能：
@@ -54,7 +54,7 @@ curl -fsSL https://raw.githubusercontent.com/10000ge10000/epic-kiosk/main/instal
 **1. 克隆项目**
 
 ```bash
-git clone https://github.com/10000ge10000/epic-kiosk.git
+git clone https://github.com/Shy0o/epic-kiosk.git
 cd epic-kiosk
 ```
 
@@ -320,4 +320,4 @@ docker compose build --no-cache && docker compose up -d
 
 ---
 
-*Created by [一万](https://github.com/10000ge10000) | 公益站点：[epic.910501.xyz](https://epic.910501.xyz/)*
+*Maintained at [Shy0o/epic-kiosk](https://github.com/Shy0o/epic-kiosk) | Original created by 一万 | 公益站点：[epic.910501.xyz](https://epic.910501.xyz/)*

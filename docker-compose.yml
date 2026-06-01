@@ -1,12 +1,12 @@
 # ============================================================
 # Epic Kiosk - 自动驾驶领取系统（本地编译版本）
 # ============================================================
-# GitHub: https://github.com/10000ge10000/epic-kiosk
+# GitHub: https://github.com/Shy0o/epic-kiosk
 # 公益站点: https://epic.910501.xyz/
 # ============================================================
 #
 # 🚀 部署方式：
-#   1. Linux 一键部署: curl -fsSL https://raw.githubusercontent.com/10000ge10000/epic-kiosk/main/install.sh | bash
+#   1. Linux 一键部署: curl -fsSL https://raw.githubusercontent.com/Shy0o/epic-kiosk/main/install.sh | bash
 #   2. 手动部署: 克隆项目 → 修改 API Key → docker compose up -d --build
 #
 # ⚠️ 必须修改: API_KEY

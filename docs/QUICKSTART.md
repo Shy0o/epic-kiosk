@@ -5,7 +5,7 @@
 ```bash
 # 设置 API Key 并一键部署
 export API_KEY="sk-你的Key"
-curl -fsSL https://raw.githubusercontent.com/10000ge10000/epic-kiosk/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Shy0o/epic-kiosk/main/install.sh | bash
 ```
 
 脚本会自动完成：
@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/10000ge10000/epic-kiosk/main/instal
 
 ### 1️⃣ 克隆项目
 ```bash
-git clone https://github.com/10000ge10000/epic-kiosk.git
+git clone https://github.com/Shy0o/epic-kiosk.git
 cd epic-kiosk
 ```
 

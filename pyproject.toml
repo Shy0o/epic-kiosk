@@ -32,11 +32,11 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/10000ge10000/epic-kiosk"
-Documentation = "https://github.com/10000ge10000/epic-kiosk"
-Repository = "https://github.com/10000ge10000/epic-kiosk.git"
-Issues = "https://github.com/10000ge10000/epic-kiosk/issues"
-Changelog = "https://github.com/10000ge10000/epic-kiosk/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/Shy0o/epic-kiosk"
+Documentation = "https://github.com/Shy0o/epic-kiosk"
+Repository = "https://github.com/Shy0o/epic-kiosk.git"
+Issues = "https://github.com/Shy0o/epic-kiosk/issues"
+Changelog = "https://github.com/Shy0o/epic-kiosk/blob/main/CHANGELOG.md"
 
 [tool.black]
 line-length = 100
