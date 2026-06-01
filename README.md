@@ -92,12 +92,13 @@ docker compose up -d --build
 
 ## 部署注意事项
 
-1. 默认 Web 端口是 `18000`，访问地址为 `http://服务器IP:18000`。
+1. 默认 Web 端口是 `19625`，访问地址为 `http://服务器IP:19625`；可通过 `WEB_PORT` 修改。
 2. 默认 AI 提供商是 SiliconFlow，接口地址为 `https://api.siliconflow.cn/v1`。
 3. `API_KEY` 必须放在 `.env`，`.env` 已被 `.gitignore` 忽略。
 4. 旧版 `API_KEY` / `API_BASE_URL` 仍可兼容读取，但新部署不要再使用旧变量名。
-5. 默认 `USE_WARP=true`，WARP 容器负责访问 Epic Games；如果要使用服务器自身 IP，设置 `USE_WARP=false` 后执行 `docker compose up -d --build`。
-6. 如果 Epic 风控严重，可能需要更稳定的住宅代理或更换出口。
+5. 设置 `WEB_LOGIN_PASSWORD` 后，访问网站需要先输入该密码；留空则不启用网页登录保护。
+6. 默认 `USE_WARP=true`，WARP 容器负责访问 Epic Games；如果要使用服务器自身 IP，设置 `USE_WARP=false` 后执行 `docker compose up -d --build`。
+7. 如果 Epic 风控严重，可能需要更稳定的住宅代理或更换出口。
 
 ---
 
@@ -118,6 +119,24 @@ docker compose up -d --build
 
 - 输入密码后点击红色删除按钮。
 - 系统将清除数据库记录和本地 Cookie 数据。
+
+### Web 访问控制
+
+如需个人使用，在 `.env` 中设置网站访问密码：
+
+```env
+WEB_PORT=19625
+WEB_LOGIN_PASSWORD=你的访问密码
+WEB_AUTH_SECRET=任意随机长字符串
+```
+
+修改后重新构建并启动：
+
+```bash
+docker compose up -d --build
+```
+
+`WEB_LOGIN_PASSWORD` 留空时不启用登录保护。`WEB_AUTH_SECRET` 用于签发登录 Cookie，建议设置为不同于登录密码的随机字符串。
 
 ---
 

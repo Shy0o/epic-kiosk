@@ -332,6 +332,8 @@ API_KEY=%s
 show_complete() {
     # 只显示公网 IPv4 地址
     PUBLIC_IP=$(curl -4 -s --connect-timeout 3 ifconfig.me 2>/dev/null)
+    WEB_PORT=$(grep -E "^WEB_PORT=" .env 2>/dev/null | tail -1 | cut -d= -f2)
+    WEB_PORT=${WEB_PORT:-19625}
 
     echo ""
     echo -e "${GREEN}============================================${NC}"
@@ -342,7 +344,7 @@ show_complete() {
     echo ""
     echo -e "${CYAN}访问地址:${NC}"
     if [[ -n "$PUBLIC_IP" && "$PUBLIC_IP" != "127.0.0.1" ]]; then
-        echo -e "  公网: ${YELLOW}http://$PUBLIC_IP:18000${NC}"
+        echo -e "  公网: ${YELLOW}http://$PUBLIC_IP:$WEB_PORT${NC}"
     else
         echo -e "  公网: ${YELLOW}未检测到公网 IPv4，请检查服务器网络${NC}"
     fi

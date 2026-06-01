@@ -6,9 +6,12 @@ import shutil
 import random
 import httpx
 import re
+import hmac
+import hashlib
+import time
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -16,6 +19,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
+WEB_LOGIN_PASSWORD = os.getenv("WEB_LOGIN_PASSWORD", "").strip()
+WEB_AUTH_SECRET = os.getenv("WEB_AUTH_SECRET", "").strip() or WEB_LOGIN_PASSWORD or "epic-kiosk"
+WEB_AUTH_COOKIE = "epic_kiosk_auth"
+WEB_AUTH_MAX_AGE = 60 * 60 * 24 * 30
 
 # 1. 挂载与路径
 IMAGES_DIR = "/app/data/images"
@@ -65,6 +73,132 @@ class GameLog(BaseModel):
     email: str
     game_title: str
     image_filename: str
+
+
+def _is_private_client(host: str | None) -> bool:
+    if not host:
+        return False
+    return (
+        host == "localhost"
+        or host.startswith("127.")
+        or host.startswith("10.")
+        or host.startswith("172.")
+        or host.startswith("192.168.")
+    )
+
+
+def _auth_signature(issued_at: str) -> str:
+    return hmac.new(WEB_AUTH_SECRET.encode(), issued_at.encode(), hashlib.sha256).hexdigest()
+
+
+def _create_auth_cookie() -> str:
+    issued_at = str(int(time.time()))
+    return f"{issued_at}:{_auth_signature(issued_at)}"
+
+
+def _valid_auth_cookie(cookie_value: str | None) -> bool:
+    if not WEB_LOGIN_PASSWORD or not cookie_value or ":" not in cookie_value:
+        return not WEB_LOGIN_PASSWORD
+
+    issued_at, signature = cookie_value.split(":", 1)
+    if not issued_at.isdigit():
+        return False
+    if int(time.time()) - int(issued_at) > WEB_AUTH_MAX_AGE:
+        return False
+    return hmac.compare_digest(signature, _auth_signature(issued_at))
+
+
+def _login_page(error: str = "") -> HTMLResponse:
+    error_html = f'<div class="error">{error}</div>' if error else ""
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epic Kiosk 登录</title>
+    <style>
+        * {{ box-sizing: border-box; }}
+        body {{
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            background: #0f172a;
+            color: #e5e7eb;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }}
+        form {{
+            width: min(360px, calc(100vw - 32px));
+            padding: 28px;
+            border: 1px solid #334155;
+            background: #111827;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+        }}
+        h1 {{ margin: 0 0 18px; font-size: 22px; font-weight: 700; }}
+        label {{ display: block; margin-bottom: 8px; color: #94a3b8; font-size: 14px; }}
+        input {{
+            width: 100%;
+            height: 44px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background: #020617;
+            color: #f8fafc;
+            padding: 0 12px;
+            font-size: 16px;
+        }}
+        button {{
+            width: 100%;
+            height: 44px;
+            margin-top: 16px;
+            border: 0;
+            border-radius: 6px;
+            background: #2563eb;
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+        }}
+        .error {{
+            margin-bottom: 14px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            background: rgba(239, 68, 68, .12);
+            color: #fecaca;
+            font-size: 14px;
+        }}
+    </style>
+</head>
+<body>
+    <form method="post" action="/login">
+        <h1>Epic Kiosk</h1>
+        {error_html}
+        <label for="password">访问密码</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" autofocus>
+        <button type="submit">登录</button>
+    </form>
+</body>
+</html>""")
+
+
+@app.middleware("http")
+async def web_auth_middleware(request: Request, call_next):
+    if not WEB_LOGIN_PASSWORD:
+        return await call_next(request)
+
+    path = request.url.path
+    if path == "/login":
+        return await call_next(request)
+
+    if path in {"/api/report_game", "/api/nuke_account"} and _is_private_client(request.client.host):
+        return await call_next(request)
+
+    if _valid_auth_cookie(request.cookies.get(WEB_AUTH_COOKIE)):
+        return await call_next(request)
+
+    if path.startswith("/api/"):
+        return JSONResponse(status_code=401, content={"status": "unauthorized", "msg": "请先登录"})
+
+    return RedirectResponse(url="/login", status_code=303)
 
 # --- 🛡️ 防滥用中间件 (多层防护) ---
 @app.middleware("http")
@@ -139,6 +273,33 @@ def _perform_physical_delete(email):
     return "，".join(log_msgs)
 
 # --- API 接口 ---
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    return _login_page()
+
+@app.post("/login")
+async def login(request: Request):
+    form = await request.form()
+    password = str(form.get("password", ""))
+    if not hmac.compare_digest(password, WEB_LOGIN_PASSWORD):
+        return _login_page("密码错误，请重试")
+
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(
+        WEB_AUTH_COOKIE,
+        _create_auth_cookie(),
+        max_age=WEB_AUTH_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+    )
+    return response
+
+@app.post("/logout")
+async def logout():
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie(WEB_AUTH_COOKIE)
+    return response
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):

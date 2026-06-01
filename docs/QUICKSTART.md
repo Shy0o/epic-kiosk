@@ -54,7 +54,7 @@ docker compose up -d --build
 
 ## ✅ 访问控制台
 
-打开浏览器：`http://服务器IP:18000`
+打开浏览器：`http://服务器IP:19625`
 
 在 Web 界面添加 Epic 账号，系统会自动处理后续所有流程。
 
