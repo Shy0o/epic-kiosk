@@ -138,6 +138,15 @@ docker compose up -d --build
 
 `WEB_LOGIN_PASSWORD` 留空时不启用登录保护。`WEB_AUTH_SECRET` 用于签发登录 Cookie，建议设置为不同于登录密码的随机字符串。
 
+### 通知设置
+
+网页端提供「通知设置」Tab，可启用领取成功通知：
+
+- Telegram Bot：填写 Bot Token 和 Chat ID。
+- 通用 Webhook：向配置的 URL 发送 `{title, message}` JSON。
+
+保存后可点击「发送测试」确认通道可用。通知设置保存在本地 SQLite 数据库中，不会写入仓库。
+
 ---
 
 ## 配置说明

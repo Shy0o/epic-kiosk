@@ -53,10 +53,6 @@ services:
     environment:
       - REDIS_HOST=redis
       - TZ=Asia/Shanghai
-      # 历史数据偏移量配置（用于补偿丢失的记录，其他用户无需修改）
-      - CLAIM_HISTORY_OFFSET=1132
-      - ACCOUNT_VERIFIED_OFFSET=140
-      - ACCOUNT_TOTAL_OFFSET=140
       # 网站访问密码：留空则不启用登录保护
       - WEB_LOGIN_PASSWORD=${WEB_LOGIN_PASSWORD:-}
       - WEB_AUTH_SECRET=${WEB_AUTH_SECRET:-}

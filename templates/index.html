@@ -143,11 +143,6 @@
         .stat-label { font-size: 14px; color: #94a3b8; white-space: nowrap; }
         .stat-value { font-size: 24px; font-weight: 700; }
 
-        .announcement-bar {
-            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
-            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
-        }
-
         .free-game-card {
             position: relative;
             overflow: hidden;
@@ -412,18 +407,6 @@
     <canvas id="particles-canvas"></canvas>
     <div id="toast-container"></div>
 
-    <!-- 顶部公告栏 - 可手动关闭 -->
-    <div id="announcement-bar" class="announcement-bar py-3 px-4 text-center text-sm relative">
-        <div class="flex items-center justify-center gap-2 flex-wrap pr-8">
-            <span>📢</span>
-            <span class="text-blue-200">欢迎大家使用 Epic 自动驾驶！有问题欢迎关注我的 B 站频道：
-                <a href="https://space.bilibili.com/59438380" target="_blank" class="text-blue-400 hover:text-blue-300 font-semibold hover:underline">一万AI分享</a>
-                ，获取更多教程和更新动态
-            </span>
-        </div>
-        <button onclick="closeAnnouncement()" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors text-lg" title="关闭公告">✕</button>
-    </div>
-
     <div class="content-wrapper p-4 md:p-6">
 
         <!-- 头部 -->
@@ -443,6 +426,7 @@
                 <button onclick="switchTab('deposit')" id="tab-deposit" class="tab-btn tab-btn-active">自动驾驶</button>
                 <button onclick="switchTab('query')" id="tab-query" class="tab-btn tab-btn-inactive">资产清单</button>
                 <button onclick="switchTab('free-games')" id="tab-free-games" class="tab-btn tab-btn-inactive">免费游戏</button>
+                <button onclick="switchTab('settings')" id="tab-settings" class="tab-btn tab-btn-inactive">通知设置</button>
             </div>
         </div>
 
@@ -600,6 +584,52 @@
                     <a href="https://store.epicgames.com/zh-CN/free-games" target="_blank" class="inline-block mt-4 text-blue-400 hover:text-blue-300 text-base">前往 Epic 官网查看 →</a>
                 </div>
             </div>
+
+            <!-- 通知设置 Tab -->
+            <div id="view-settings" class="tab-content tab-content-scroll hidden">
+                <div class="glass-panel rounded-2xl p-6 max-w-2xl mx-auto">
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold text-white mb-1">通知设置</h3>
+                        <p class="text-sm text-slate-400">领取成功后发送通知；支持 Telegram Bot 和通用 Webhook。</p>
+                    </div>
+
+                    <div class="space-y-5">
+                        <label class="flex items-center gap-3 text-sm text-slate-300">
+                            <input type="checkbox" id="notify_enabled" class="custom-checkbox">
+                            <span>启用通知</span>
+                        </label>
+
+                        <div>
+                            <label class="block text-sm text-slate-400 mb-2">通知方式</label>
+                            <select id="notify_provider" onchange="renderNotifyProvider()" class="w-full bg-slate-900/60 border border-slate-600 text-white work-input focus:outline-none focus:border-blue-500">
+                                <option value="telegram">Telegram Bot</option>
+                                <option value="webhook">通用 Webhook</option>
+                            </select>
+                        </div>
+
+                        <div id="notify_telegram_fields" class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-slate-400 mb-2">Telegram Bot Token</label>
+                                <input id="notify_telegram_bot_token" type="password" placeholder="123456:ABC-DEF..." class="w-full bg-slate-900/60 border border-slate-600 text-white work-input focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-slate-400 mb-2">Telegram Chat ID</label>
+                                <input id="notify_telegram_chat_id" type="text" placeholder="例如 123456789 或 -100..." class="w-full bg-slate-900/60 border border-slate-600 text-white work-input focus:outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <div id="notify_webhook_fields" class="hidden">
+                            <label class="block text-sm text-slate-400 mb-2">Webhook URL</label>
+                            <input id="notify_webhook_url" type="url" placeholder="https://example.com/webhook" class="w-full bg-slate-900/60 border border-slate-600 text-white work-input focus:outline-none focus:border-blue-500">
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                            <button onclick="saveNotificationSettings()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all">保存设置</button>
+                            <button onclick="testNotification()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition-all">发送测试</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- 成功弹窗 -->
@@ -727,14 +757,6 @@
         }
 
         // Toast
-        function closeAnnouncement() {
-            const bar = document.getElementById('announcement-bar');
-            bar.style.transition = 'opacity 0.3s, transform 0.3s';
-            bar.style.opacity = '0';
-            bar.style.transform = 'translateY(-100%)';
-            setTimeout(() => bar.style.display = 'none', 300);
-        }
-
         function showToast(message, type = 'info', duration = 4000) {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -764,10 +786,7 @@
         async function fetchSystemStats() {
             try {
                 const res = await axios.get('/api/system_stats');
-                // 账号显示格式: 已验证数/总数 (如: 33/27 → 27/27)
-                const verified = res.data.verified_accounts || 0;
-                const total = res.data.total_accounts || 0;
-                document.getElementById('stat-accounts').textContent = `${verified}/${total}`;
+                document.getElementById('stat-accounts').textContent = res.data.total_accounts || 0;
                 document.getElementById('stat-today').textContent = res.data.today_claims;
                 document.getElementById('stat-total').textContent = res.data.total_claims;
                 // 队列任务数 = 等待中 + 处理中
@@ -778,8 +797,8 @@
 
         // Tab 切换
         function switchTab(tab) {
-            ['deposit', 'query', 'free-games'].forEach(t => document.getElementById('view-' + t).classList.add('hidden'));
-            ['deposit', 'query', 'free-games'].forEach(t => {
+            ['deposit', 'query', 'free-games', 'settings'].forEach(t => document.getElementById('view-' + t).classList.add('hidden'));
+            ['deposit', 'query', 'free-games', 'settings'].forEach(t => {
                 const btn = document.getElementById('tab-' + t);
                 if (tab === t) {
                     btn.className = 'tab-btn tab-btn-active';
@@ -789,6 +808,53 @@
             });
             document.getElementById('view-' + tab).classList.remove('hidden');
             if (tab === 'free-games') fetchFreeGames();
+            if (tab === 'settings') loadNotificationSettings();
+        }
+
+        function renderNotifyProvider() {
+            const provider = document.getElementById('notify_provider').value;
+            document.getElementById('notify_telegram_fields').classList.toggle('hidden', provider !== 'telegram');
+            document.getElementById('notify_webhook_fields').classList.toggle('hidden', provider !== 'webhook');
+        }
+
+        async function loadNotificationSettings() {
+            try {
+                const res = await axios.get('/api/notification_settings');
+                document.getElementById('notify_enabled').checked = !!res.data.enabled;
+                document.getElementById('notify_provider').value = res.data.provider || 'telegram';
+                document.getElementById('notify_telegram_bot_token').value = res.data.telegram_bot_token || '';
+                document.getElementById('notify_telegram_chat_id').value = res.data.telegram_chat_id || '';
+                document.getElementById('notify_webhook_url').value = res.data.webhook_url || '';
+                renderNotifyProvider();
+            } catch (e) {
+                showToast('读取通知设置失败', 'error');
+            }
+        }
+
+        async function saveNotificationSettings() {
+            const payload = {
+                enabled: document.getElementById('notify_enabled').checked,
+                provider: document.getElementById('notify_provider').value,
+                telegram_bot_token: document.getElementById('notify_telegram_bot_token').value,
+                telegram_chat_id: document.getElementById('notify_telegram_chat_id').value,
+                webhook_url: document.getElementById('notify_webhook_url').value
+            };
+            try {
+                const res = await axios.post('/api/notification_settings', payload);
+                showToast(res.data.msg || '通知设置已保存', 'success');
+            } catch (e) {
+                showToast('保存通知设置失败', 'error');
+            }
+        }
+
+        async function testNotification() {
+            await saveNotificationSettings();
+            try {
+                const res = await axios.post('/api/test_notification');
+                showToast(res.data.msg, res.data.status === 'success' ? 'success' : 'error');
+            } catch (e) {
+                showToast('测试通知失败', 'error');
+            }
         }
 
         // 免费游戏 - 更大的封面

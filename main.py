@@ -33,12 +33,6 @@ app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
 DATA_DIR = "/app/data"
 DB_PATH = os.path.join(DATA_DIR, "kiosk.db")
 
-# 历史数据偏移量配置（通过环境变量设置，默认为 0）
-# 用于补偿因入库 API 失效丢失的历史记录
-# 其他用户部署时默认为 0，不影响其数据显示
-CLAIM_HISTORY_OFFSET = int(os.getenv("CLAIM_HISTORY_OFFSET", "0"))
-ACCOUNT_VERIFIED_OFFSET = int(os.getenv("ACCOUNT_VERIFIED_OFFSET", "0"))
-ACCOUNT_TOTAL_OFFSET = int(os.getenv("ACCOUNT_TOTAL_OFFSET", "0"))
 USER_DATA_DIR = os.path.join(DATA_DIR, "user_data")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(USER_DATA_DIR, exist_ok=True)
@@ -54,6 +48,9 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS logs 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   email TEXT, game_title TEXT, image_url TEXT, claim_time TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS app_settings
+                 (key TEXT PRIMARY KEY,
+                  value TEXT)''')
     conn.commit()
     conn.close()
 init_db()
@@ -73,6 +70,93 @@ class GameLog(BaseModel):
     email: str
     game_title: str
     image_filename: str
+
+class NotificationSettings(BaseModel):
+    enabled: bool = False
+    provider: str = "telegram"
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    webhook_url: str = ""
+
+
+NOTIFICATION_KEYS = {
+    "enabled",
+    "provider",
+    "telegram_bot_token",
+    "telegram_chat_id",
+    "webhook_url",
+}
+
+
+def _get_app_settings() -> dict:
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT key, value FROM app_settings")
+    rows = dict(c.fetchall())
+    conn.close()
+    return rows
+
+
+def _get_notification_settings() -> dict:
+    rows = _get_app_settings()
+    return {
+        "enabled": rows.get("notification_enabled", "false") == "true",
+        "provider": rows.get("notification_provider", "telegram"),
+        "telegram_bot_token": rows.get("notification_telegram_bot_token", ""),
+        "telegram_chat_id": rows.get("notification_telegram_chat_id", ""),
+        "webhook_url": rows.get("notification_webhook_url", ""),
+    }
+
+
+def _save_notification_settings(settings: NotificationSettings) -> None:
+    provider = settings.provider if settings.provider in {"telegram", "webhook"} else "telegram"
+    values = {
+        "notification_enabled": "true" if settings.enabled else "false",
+        "notification_provider": provider,
+        "notification_telegram_bot_token": settings.telegram_bot_token.strip(),
+        "notification_telegram_chat_id": settings.telegram_chat_id.strip(),
+        "notification_webhook_url": settings.webhook_url.strip(),
+    }
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.executemany(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+        values.items(),
+    )
+    conn.commit()
+    conn.close()
+
+
+async def _send_notification(title: str, message: str) -> tuple[bool, str]:
+    settings = _get_notification_settings()
+    if not settings["enabled"]:
+        return True, "notification disabled"
+
+    provider = settings["provider"]
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            if provider == "telegram":
+                token = settings["telegram_bot_token"]
+                chat_id = settings["telegram_chat_id"]
+                if not token or not chat_id:
+                    return False, "Telegram 配置不完整"
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json={"chat_id": chat_id, "text": f"{title}\n\n{message}"},
+                )
+            elif provider == "webhook":
+                webhook_url = settings["webhook_url"]
+                if not webhook_url:
+                    return False, "Webhook URL 未配置"
+                resp = await client.post(webhook_url, json={"title": title, "message": message})
+            else:
+                return False, "未知通知方式"
+
+        if resp.status_code >= 400:
+            return False, f"通知发送失败: HTTP {resp.status_code}"
+        return True, "通知已发送"
+    except Exception as e:
+        return False, str(e)[:120]
 
 
 def _is_private_client(host: str | None) -> bool:
@@ -406,6 +490,20 @@ async def query_logs(account: QueryAccount):
     logs = [{"game": r[0], "time": r[1], "image": f"/images/{r[2]}" if r[2] else "/images/default.jpg"} for r in rows]
     return {"status": "success", "data": logs}
 
+@app.get("/api/notification_settings")
+async def get_notification_settings():
+    return _get_notification_settings()
+
+@app.post("/api/notification_settings")
+async def save_notification_settings(settings: NotificationSettings):
+    _save_notification_settings(settings)
+    return {"status": "success", "msg": "通知设置已保存"}
+
+@app.post("/api/test_notification")
+async def test_notification():
+    ok, msg = await _send_notification("Epic Kiosk 测试通知", "通知通道已连接成功。")
+    return {"status": "success" if ok else "fail", "msg": msg}
+
 @app.post("/api/report_game")
 async def report_game(log: GameLog):
     conn = sqlite3.connect(DB_PATH)
@@ -420,6 +518,12 @@ async def report_game(log: GameLog):
               (log.email, log.game_title, log.image_filename, now))
     conn.commit()
     conn.close()
+    ok, msg = await _send_notification(
+        "Epic Kiosk 领取成功",
+        f"账号：{log.email}\n游戏：{log.game_title}\n时间：{now}",
+    )
+    if not ok:
+        print(f"⚠️ 通知发送失败: {msg}")
     return {"status": "recorded"}
 
 # --- 🚦 错峰调度逻辑 (新增) ---
@@ -469,39 +573,30 @@ async def stop_scheduler():
 @app.get("/api/system_stats")
 async def get_system_stats():
     """
-    获取系统统计数据：
-    - 托管账号总数
-    - 已验证账号数（有领取记录）
-    - 今日领取数量
-    - 累计领取数量
-    - 系统运行时间
+    获取系统统计数据。
     """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # 托管账号总数（数据库记录 + 偏移量）
     c.execute("SELECT COUNT(*) FROM accounts")
-    total_accounts = c.fetchone()[0] + ACCOUNT_TOTAL_OFFSET
+    total_accounts = c.fetchone()[0]
 
-    # 已验证账号数（数据库记录 + 偏移量）
     c.execute("""
         SELECT COUNT(DISTINCT l.email)
         FROM logs l
         INNER JOIN accounts a ON l.email = a.email
     """)
-    verified_accounts = c.fetchone()[0] + ACCOUNT_VERIFIED_OFFSET
+    verified_accounts = c.fetchone()[0]
 
-    # 待验证账号数（数据库记录 + 偏移量）
-    pending_accounts = total_accounts - verified_accounts
+    pending_accounts = max(total_accounts - verified_accounts, 0)
 
     # 今日领取数量
     today = datetime.now().strftime("%Y-%m-%d")
     c.execute("SELECT COUNT(*) FROM logs WHERE claim_time LIKE ?", (f"{today}%",))
     today_claims = c.fetchone()[0]
 
-    # 累计领取数量（数据库记录 + 历史偏移量补偿）
     c.execute("SELECT COUNT(*) FROM logs")
-    total_claims = c.fetchone()[0] + CLAIM_HISTORY_OFFSET
+    total_claims = c.fetchone()[0]
 
     conn.close()
 
