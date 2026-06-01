@@ -225,7 +225,8 @@ epic-kiosk/
 ├── docker-compose.yml      # 容器编排
 ├── install.sh              # 一键部署脚本
 ├── Dockerfile              # Web 镜像
-└── Dockerfile.worker       # Worker 镜像
+├── Dockerfile.worker       # Worker 业务镜像
+└── Dockerfile.worker-base  # Worker 基础镜像（系统依赖、浏览器、Python 依赖）
 ```
 
 ---
@@ -317,12 +318,20 @@ cat data/logs/error-$(date +%Y-%m-%d).log
 ### 重新构建
 
 ```bash
-# 仅重新构建 Worker
+# 首次部署或依赖/浏览器版本变化时，先构建 Worker 基础镜像
+docker build -f Dockerfile.worker-base -t epic-kiosk-worker-base:local .
+
+# 日常代码更新时，仅重新构建轻量 Worker
 docker compose build worker && docker compose up -d worker
+
+# 或使用脚本自动检查基础镜像是否存在
+./scripts/build_runtime.sh && docker compose up -d
 
 # 重新构建所有服务
 docker compose build --no-cache && docker compose up -d
 ```
+
+Worker 的系统依赖、Playwright、Camoufox 和 Python 依赖都放在 `epic-kiosk-worker-base:local`。平时只改业务代码时，不需要反复下载浏览器和依赖。
 
 ---
 

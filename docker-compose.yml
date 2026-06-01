@@ -15,7 +15,8 @@
 # 📦 镜像说明：
 #   - redis:alpine - 官方镜像，直接拉取
 #   - epic-kiosk-web - 本地编译
-#   - epic-kiosk-worker - 本地编译（含 WARP 网络代理）
+#   - epic-kiosk-worker-base - 本地编译（系统依赖、浏览器、Python 依赖）
+#   - epic-kiosk-worker - 本地编译（只包含业务代码）
 # ============================================================
 
 services:
@@ -99,13 +100,15 @@ services:
 
   # ============================================================
   # Worker: 后台任务执行器（浏览器自动化）
-  # 本地编译，首次部署约需 5-10 分钟
+  # 基于 epic-kiosk-worker-base:local，日常代码更新只需重建轻量层
   # 通过 WARP 代理访问 Epic Games
   # ============================================================
   worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
+      args:
+        WORKER_BASE_IMAGE: ${WORKER_BASE_IMAGE:-epic-kiosk-worker-base:local}
     image: epic-kiosk-worker:local
     container_name: epic-worker
     user: root

@@ -308,6 +308,13 @@ API_KEY=%s
     print_info "正在构建 Web 服务..."
     docker compose build web 2>&1 | tail -5
 
+    if ! docker image inspect epic-kiosk-worker-base:local >/dev/null 2>&1; then
+        print_info "正在构建 Worker 基础镜像（系统依赖、浏览器、Python 依赖）..."
+        docker build -f Dockerfile.worker-base -t epic-kiosk-worker-base:local . 2>&1 | tail -5
+    else
+        print_info "Worker 基础镜像已存在，跳过重建"
+    fi
+
     print_info "正在构建 Worker 服务..."
     docker compose build worker 2>&1 | tail -5
 
